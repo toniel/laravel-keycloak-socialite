@@ -1,0 +1,50 @@
+{
+    "name": "toniel/laravel-keycloak-socialite",
+    "description": "Reusable Keycloak Socialite authentication for Laravel applications.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "keycloak",
+        "socialite",
+        "sso",
+        "openid-connect"
+    ],
+    "authors": [
+        {
+            "name": "Toni Listiyo",
+            "email": "toni@aiu.edu.my"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^12.0",
+        "illuminate/support": "^12.0",
+        "laravel/socialite": "^5.27",
+        "socialiteproviders/keycloak": "^5.3"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "phpunit/phpunit": "^11.0",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Toniel\\LaravelKeycloakSocialite\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Toniel\\LaravelKeycloakSocialite\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Toniel\\LaravelKeycloakSocialite\\KeycloakSocialiteServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
