@@ -21,6 +21,7 @@ class HandleKeycloakCallbackController
         // 1. Obtain the Socialite user from Keycloak
         try {
             $socialiteUser = Socialite::driver('keycloak')->user();
+            dd($socialiteUser);
         } catch (\Exception $e) {
             Log::error('Keycloak authentication failed: ' . $e->getMessage());
 
@@ -49,9 +50,17 @@ class HandleKeycloakCallbackController
 
         if ($user) {
             // Existing user — update identity fields
+            $rawUser = $socialiteUser->getRaw();
+            dd($rawUser);
+            $additionalData = [
+                'google_id' => $rawUser['google_id'] ?? null,
+                'google_avatar' => $rawUser['google_avatar'] ?? null,
+            ];
+
             $user->updateKeycloakIdentity(
                 $socialiteUser->getId(),
                 $socialiteUser->getAvatar(),
+                $additionalData
             );
 
             event(new KeycloakUserAuthenticated(

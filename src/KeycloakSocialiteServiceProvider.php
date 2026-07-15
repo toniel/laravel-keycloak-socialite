@@ -2,10 +2,9 @@
 
 namespace Toniel\LaravelKeycloakSocialite;
 
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
-use SocialiteProviders\Keycloak\KeycloakExtendSocialite;
-use SocialiteProviders\Manager\SocialiteWasCalled;
+use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
+use Toniel\LaravelKeycloakSocialite\Providers\ExtendedKeycloakProvider;
 
 class KeycloakSocialiteServiceProvider extends ServiceProvider
 {
@@ -25,8 +24,12 @@ class KeycloakSocialiteServiceProvider extends ServiceProvider
                 => database_path('migrations/' . date('Y_m_d_His') . '_add_keycloak_fields_to_users_table.php'),
         ], 'keycloak-socialite-migrations');
 
-        // Register the Keycloak Socialite provider automatically
-        Event::listen(SocialiteWasCalled::class, KeycloakExtendSocialite::class);
+        // Register the extended Keycloak provider (supports optional Google federated identity)
+        $socialite = $this->app->make(SocialiteFactory::class);
+        $socialite->extend('keycloak', function ($app) use ($socialite) {
+            $config = $app['config']['services.keycloak'];
+            return $socialite->buildProvider(ExtendedKeycloakProvider::class, $config);
+        });
 
         // Load routes (if enabled in config)
         if (config('keycloak-socialite.routes.enabled', true)) {

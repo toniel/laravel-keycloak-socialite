@@ -173,6 +173,117 @@ Event::listen(KeycloakAuthenticationFailed::class, function (KeycloakAuthenticat
 });
 ```
 
+## Federated Identity Provider Support (Optional)
+
+The package supports capturing federated identity provider data (e.g., Google ID and avatar) when users authenticate via an external identity provider configured in Keycloak.
+
+### How It Works
+
+When you configure Google (or another IdP) as an identity provider in Keycloak:
+
+1. **Authentication Flow**: Laravel → Keycloak → Google → Keycloak → Laravel
+2. **From Laravel's perspective**: The OAuth provider is Keycloak, not Google directly
+3. **Optional Data**: If Keycloak is configured to pass federated identity claims, the package will capture them
+
+### Database Columns
+
+The published migration includes optional columns for Google identity:
+
+- `google_id` — Google user ID (sub claim)
+- `google_avatar` — Google profile picture URL
+
+These columns will remain `null` if:
+- Keycloak is not configured to pass Google data
+- The user authenticates via Keycloak directly (not through Google)
+- You're using a different identity provider
+
+### Keycloak Configuration
+
+To enable Google identity data capture, configure Keycloak to pass the federated identity claims:
+
+#### Step 1: Create Identity Provider Mappers
+
+In Keycloak Admin Console:
+
+1. Navigate to **Realm Settings** → **Identity Providers** → **Google**
+2. Go to the **Mappers** tab
+3. Click **Create** to add a new mapper
+
+**Mapper 1: Google User ID**
+```
+Name: google-id
+Mapper Type: Attribute Importer
+Social Profile JSON Field Path: sub
+User Attribute Name: google_id
+```
+
+**Mapper 2: Google Avatar**
+```
+Name: google-avatar
+Mapper Type: Attribute Importer
+Social Profile JSON Field Path: picture
+User Attribute Name: google_avatar
+```
+
+#### Step 2: Expose Attributes to Userinfo Endpoint
+
+1. Navigate to **Client Scopes** → select your client's scope
+2. Go to the **Mappers** tab
+3. Click **Create** to add protocol mappers
+
+**Mapper 1: Google ID to Token**
+```
+Name: google-id-mapper
+Mapper Type: User Attribute
+User Attribute: google_id
+Token Claim Name: google_id
+Claim JSON Type: String
+Add to userinfo: ON
+```
+
+**Mapper 2: Google Avatar to Token**
+```
+Name: google-avatar-mapper
+Mapper Type: User Attribute
+User Attribute: google_avatar
+Token Claim Name: google_avatar
+Claim JSON Type: String
+Add to userinfo: ON
+```
+
+### How the Package Handles It
+
+The package's `ExtendedKeycloakProvider` automatically reads these optional claims from the Keycloak userinfo response:
+
+```php
+// If present in userinfo response:
+{
+  "sub": "ae7c9266-dd83-4e8a-bad9-90e808e6d345",  // Keycloak ID
+  "email": "user@example.com",
+  "name": "John Doe",
+  "google_id": "1234567890",                      // ← Optional
+  "google_avatar": "https://lh3.googleusercontent.com/..."  // ← Optional
+}
+
+// Both keycloak_id and google_id will be saved to your users table
+```
+
+The `HasKeycloakIdentity` trait will:
+- Save `google_id` and `google_avatar` on user creation (if present)
+- Update them on first login (if currently null and data is present)
+- Leave them null if Keycloak doesn't provide the data
+
+### Backward Compatibility
+
+This feature is **completely optional and backward compatible**:
+
+- ✅ Works without any Keycloak configuration changes
+- ✅ No changes required to your User model
+- ✅ No errors if Google data is not present
+- ✅ Existing users are not affected
+
+If you don't configure Keycloak to pass Google data, the `google_id` and `google_avatar` columns will simply remain `null`.
+
 ## Customising the Controller
 
 If you need to override the controller logic entirely, bind your own controller in a service provider, then update the config:

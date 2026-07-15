@@ -31,9 +31,10 @@ interface KeycloakAuthenticatable
      *
      * @param  string       $keycloakId
      * @param  string|null  $avatar
+     * @param  array        $additionalData  Optional federated identity data (e.g., google_id, google_avatar)
      * @return bool  Whether the update succeeded.
      */
-    public function updateKeycloakIdentity(string $keycloakId, ?string $avatar): bool;
+    public function updateKeycloakIdentity(string $keycloakId, ?string $avatar, array $additionalData = []): bool;
 
     /**
      * Return the URL the user should be redirected to after a successful

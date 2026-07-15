@@ -25,12 +25,10 @@ trait HasKeycloakIdentity
     }
 
     /**
-     * Update keycloak_id and keycloak_avatar — only when they are not already set.
-     *
-     * This matches the "first-login wins" behaviour: once a user logs in via
-     * Keycloak, subsequent logins do not overwrite these fields.
+     * Update keycloak_id, keycloak_avatar, and optional federated identity data.
+     * Only updates fields that are currently null (first-login wins behavior).
      */
-    public function updateKeycloakIdentity(string $keycloakId, ?string $avatar): bool
+    public function updateKeycloakIdentity(string $keycloakId, ?string $avatar, array $additionalData = []): bool
     {
         $idColumn = config('keycloak-socialite.columns.keycloak_id', 'keycloak_id');
         $avatarColumn = config('keycloak-socialite.columns.keycloak_avatar', 'keycloak_avatar');
@@ -43,6 +41,15 @@ trait HasKeycloakIdentity
 
         if (is_null($this->{$avatarColumn}) && $avatar) {
             $update[$avatarColumn] = $avatar;
+        }
+
+        // Optional: Update Google identity if provided and not already set
+        if (isset($additionalData['google_id']) && is_null($this->google_id)) {
+            $update['google_id'] = $additionalData['google_id'];
+        }
+
+        if (isset($additionalData['google_avatar']) && is_null($this->google_avatar)) {
+            $update['google_avatar'] = $additionalData['google_avatar'];
         }
 
         if (! empty($update)) {
@@ -75,12 +82,26 @@ trait HasKeycloakIdentity
         $idColumn = config('keycloak-socialite.columns.keycloak_id', 'keycloak_id');
         $avatarColumn = config('keycloak-socialite.columns.keycloak_avatar', 'keycloak_avatar');
 
-        return [
+        $fillable = [
             'name'          => $socialiteUser->getName(),
             'email'         => $socialiteUser->getEmail(),
             $idColumn       => $socialiteUser->getId(),
             $avatarColumn   => $socialiteUser->getAvatar(),
             'password'      => Hash::make(Str::random(24)),
         ];
+
+        // Optional: Include Google identity if passed from Keycloak via custom claims
+        // This will only work if Keycloak is configured with Identity Provider Mappers
+        $rawUser = $socialiteUser->getRaw();
+
+        if (isset($rawUser['google_id'])) {
+            $fillable['google_id'] = $rawUser['google_id'];
+        }
+
+        if (isset($rawUser['google_avatar'])) {
+            $fillable['google_avatar'] = $rawUser['google_avatar'];
+        }
+
+        return $fillable;
     }
 }
