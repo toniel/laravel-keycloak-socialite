@@ -56,7 +56,7 @@ return [
     | across browser restarts.
     |
     */
-    'remember_login' => env('KEYCLOAK_REMEMBER_LOGIN', true),
+    'remember_login' => env('KEYCLOAK_REMEMBER_LOGIN', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -106,6 +106,7 @@ return [
         'redirect'    => 'auth/keycloak',
         'callback'    => 'auth/keycloak/callback',
         'logout'      => 'auth/keycloak/logout',
+        'backchannel_logout' => 'auth/keycloak/backchannel-logout',
 
         'redirect_as' => 'login.keycloak',
         'callback_as' => 'login.keycloak.callback',
@@ -117,14 +118,31 @@ return [
     | Logout Configuration
     |--------------------------------------------------------------------------
     |
-    | redirect_after_logout: Where to send the user after they are logged out
-    |                        from both Laravel and Keycloak.
-    | redirect_to_keycloak: The Keycloak logout endpoint. Use null to construct
-    |                       it automatically from base_url and realms.
+    | mode:
+    |   'local'    — Destroy the local Laravel session only.
+    |                No redirect to Keycloak. The user stays logged into
+    |                Keycloak's SSO session.
+    |   'keycloak' — Destroy both the local session AND the Keycloak SSO
+    |                session. The user is redirected to Keycloak's logout
+    |                endpoint, which then redirects back to 'redirect_url'.
+    |                When 'id_token_hint' is true, the id_token obtained
+    |                during login is sent so Keycloak skips its confirmation
+    |                page.
+    |
+    | redirect_url: Used in 'keycloak' mode as the post_logout_redirect_uri.
+    |               Must be registered in Keycloak's "Valid Post Logout
+    |               Redirect URIs" for this client.
+    |
+    | id_token_hint: When true (and mode is 'keycloak'), sends the id_token
+    |                so Keycloak logs out silently without asking the user
+    |                to confirm.
     |
     */
     'logout' => [
-        'redirect_after_logout' => env('KEYCLOAK_LOGOUT_REDIRECT', '/'),
+        'mode'                => env('KEYCLOAK_LOGOUT_MODE', 'keycloak'),
+        'redirect_url'        => env('KEYCLOAK_LOGOUT_REDIRECT', '/'),
+        'id_token_hint'       => env('KEYCLOAK_LOGOUT_ID_TOKEN_HINT', true),
+        'backchannel_enabled' => env('KEYCLOAK_BACKCHANNEL_LOGOUT', true),
     ],
 
 ];

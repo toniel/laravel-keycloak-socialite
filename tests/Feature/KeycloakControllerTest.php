@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Toniel\LaravelKeycloakSocialite\Events\KeycloakAuthenticationFailed;
 use Toniel\LaravelKeycloakSocialite\Events\KeycloakUserAuthenticated;
 use Toniel\LaravelKeycloakSocialite\Events\KeycloakUserCreated;
@@ -24,7 +25,7 @@ class KeycloakControllerTest extends TestCase
         Route::get('login', fn () => 'Login page')->name('login');
     }
 
-    /** @test */
+    #[Test]
     public function it_redirects_to_keycloak_with_idp_hint(): void
     {
         $mockDriver = Mockery::mock();
@@ -45,7 +46,7 @@ class KeycloakControllerTest extends TestCase
         $this->assertStringContainsString('kc_idp_hint=google', $redirectUrl);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_callback_and_authenticates_existing_user(): void
     {
         Event::fake();
@@ -69,7 +70,7 @@ class KeycloakControllerTest extends TestCase
         Event::assertNotDispatched(KeycloakUserCreated::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_callback_and_creates_new_user_when_auto_register_enabled(): void
     {
         Event::fake();
@@ -90,7 +91,7 @@ class KeycloakControllerTest extends TestCase
         Event::assertNotDispatched(KeycloakUserAuthenticated::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_unknown_user_when_auto_register_disabled(): void
     {
         config(['keycloak-socialite.auto_register' => false]);
@@ -108,7 +109,7 @@ class KeycloakControllerTest extends TestCase
         Event::assertDispatched(KeycloakAuthenticationFailed::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_socialite_exception_on_callback(): void
     {
         Event::fake();
@@ -129,7 +130,7 @@ class KeycloakControllerTest extends TestCase
         Event::assertDispatched(KeycloakAuthenticationFailed::class);
     }
 
-    /** @test */
+    #[Test]
     public function event_can_override_redirect_url(): void
     {
         Event::listen(KeycloakUserAuthenticated::class, function (KeycloakUserAuthenticated $event) {
@@ -150,7 +151,7 @@ class KeycloakControllerTest extends TestCase
         $response->assertRedirect('/admin/dashboard');
     }
 
-    /** @test */
+    #[Test]
     public function user_model_can_provide_redirect_url(): void
     {
         config(['keycloak-socialite.user_model' => RedirectOverrideUser::class]);
@@ -169,18 +170,60 @@ class KeycloakControllerTest extends TestCase
         $response->assertRedirect('/custom-dashboard');
     }
 
-    /** @test */
-    public function it_handles_logout(): void
+    #[Test]
+    public function it_handles_local_logout(): void
     {
-        config(['keycloak-socialite.logout.redirect_after_logout' => '/']);
+        config(['keycloak-socialite.logout.mode' => 'local']);
 
-        $mockDriver = Mockery::mock();
-        $mockDriver->shouldReceive('getLogoutUrl')
-            ->once()
-            ->with('/', 'test-client')
-            ->andReturn('https://auth.example.com/realms/test-realm/protocol/openid-connect/logout');
+        $user = TestUser::create([
+            'name'     => 'Test User',
+            'email'    => 'test@example.com',
+            'password' => bcrypt('secret'),
+        ]);
 
-        Socialite::shouldReceive('driver')->with('keycloak')->once()->andReturn($mockDriver);
+        $this->actingAs($user);
+
+        $response = $this->get(route('logout.keycloak'));
+
+        // Local mode: redirect to app URL (absolute)
+        $response->assertRedirect('http://localhost/');
+        $this->assertFalse(Auth::check());
+    }
+
+    #[Test]
+    public function it_handles_keycloak_logout_with_id_token_hint(): void
+    {
+        config(['keycloak-socialite.logout.mode' => 'keycloak']);
+        config(['keycloak-socialite.logout.redirect_url' => '/']);
+        config(['keycloak-socialite.logout.id_token_hint' => true]);
+
+        $user = TestUser::create([
+            'name'     => 'Test User',
+            'email'    => 'test@example.com',
+            'password' => bcrypt('secret'),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withSession(['keycloak_id_token' => 'test-id-token'])
+            ->get(route('logout.keycloak'));
+
+        $response->assertRedirect();
+        $redirectUrl = $response->headers->get('Location');
+
+        $this->assertStringContainsString('auth.example.com', $redirectUrl);
+        $this->assertStringContainsString('test-realm', $redirectUrl);
+        $this->assertStringContainsString('id_token_hint=test-id-token', $redirectUrl);
+        $this->assertStringContainsString('post_logout_redirect_uri=', $redirectUrl);
+        $this->assertStringContainsString('client_id=test-client', $redirectUrl);
+        $this->assertFalse(Auth::check());
+    }
+
+    #[Test]
+    public function it_handles_keycloak_logout_without_id_token_hint(): void
+    {
+        config(['keycloak-socialite.logout.mode' => 'keycloak']);
+        config(['keycloak-socialite.logout.redirect_url' => '/']);
+        config(['keycloak-socialite.logout.id_token_hint' => false]);
 
         $user = TestUser::create([
             'name'     => 'Test User',
@@ -197,6 +240,8 @@ class KeycloakControllerTest extends TestCase
 
         $this->assertStringContainsString('auth.example.com', $redirectUrl);
         $this->assertStringContainsString('test-realm', $redirectUrl);
+        $this->assertStringContainsString('client_id=test-client', $redirectUrl);
+        $this->assertStringNotContainsString('id_token_hint', $redirectUrl);
         $this->assertFalse(Auth::check());
     }
 
@@ -211,6 +256,7 @@ class KeycloakControllerTest extends TestCase
         $mock->shouldReceive('getName')->andReturn('Test User');
         $mock->shouldReceive('getId')->andReturn('456');
         $mock->shouldReceive('getAvatar')->andReturn('https://example.com/avatar.jpg');
+        $mock->shouldReceive('getRaw')->andReturn(['id_token' => 'test-id-token']);
 
         return $mock;
     }

@@ -4,8 +4,9 @@ namespace Toniel\LaravelKeycloakSocialite;
 
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
-use SocialiteProviders\Keycloak\KeycloakExtendSocialite;
+use Laravel\Socialite\Facades\Socialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use Toniel\LaravelKeycloakSocialite\Providers\KeycloakWithIdToken;
 
 class KeycloakSocialiteServiceProvider extends ServiceProvider
 {
@@ -25,8 +26,29 @@ class KeycloakSocialiteServiceProvider extends ServiceProvider
                 => database_path('migrations/' . date('Y_m_d_His') . '_add_keycloak_fields_to_users_table.php'),
         ], 'keycloak-socialite-migrations');
 
-        // Register the Keycloak Socialite provider automatically
-        Event::listen(SocialiteWasCalled::class, KeycloakExtendSocialite::class);
+        // Register the Keycloak Socialite provider — use our custom provider
+        // that captures the id_token for silent logout.
+        Event::listen(SocialiteWasCalled::class, function () {
+            Socialite::extend('keycloak', function () {
+                $config = config('keycloak-socialite.keycloak');
+                $socialConfig = new \SocialiteProviders\Manager\Config(
+                    $config['client_id'],
+                    $config['client_secret'],
+                    $config['redirect'],
+                    ['base_url' => $config['base_url'], 'realms' => $config['realms']]
+                );
+
+                $provider = new KeycloakWithIdToken(
+                    app('request'),
+                    $config['client_id'],
+                    $config['client_secret'],
+                    $config['redirect']
+                );
+                $provider->setConfig($socialConfig);
+
+                return $provider;
+            });
+        }, -10); // priority -10 :: runs AFTER the default listener, so ours wins
 
         // Load routes (if enabled in config)
         if (config('keycloak-socialite.routes.enabled', true)) {

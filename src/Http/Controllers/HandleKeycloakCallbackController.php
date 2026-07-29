@@ -82,7 +82,21 @@ class HandleKeycloakCallbackController
         // 3. Log the user in
         Auth::login($user, config('keycloak-socialite.remember_login', true));
 
-        // 4. Determine redirect URL (priority: event override → user method → config fallback)
+        // 4. Save id_token for silent logout.
+        //    SocialiteProviders\Manager stores the full token response in
+        //    accessTokenResponseBody (includes id_token from Keycloak).
+        $idToken = $socialiteUser->accessTokenResponseBody['id_token'] ?? null;
+        if (! $idToken) {
+            // Fallback: check getRaw() (for custom providers that put it there)
+            $raw = $socialiteUser->getRaw();
+            $idToken = $raw['id_token'] ?? null;
+        }
+
+        if ($idToken) {
+            session()->put('keycloak_id_token', $idToken);
+        }
+
+        // 5. Determine redirect URL (priority: event override → user method → config fallback)
         $redirectUrl ??= $user->getKeycloakRedirectUrl();
         $redirectUrl ??= config('keycloak-socialite.redirect_url', '/dashboard');
 
