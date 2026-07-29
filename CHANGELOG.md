@@ -5,6 +5,36 @@ All notable changes to `toniel/laravel-keycloak-socialite` will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-07-29
+
+### Added
+
+- **Backchannel Logout** support — Keycloak POSTs `logout_token` to `/auth/keycloak/backchannel-logout` when a user logs out from any app, destroying local sessions across all clients automatically
+- `HandleBackchannelLogoutController` — decodes JWT logout_token, finds user by `keycloak_id` (`sub`), deletes sessions from database
+- Config: `logout.backchannel_enabled` (default `true`)
+- Config: `routes.backchannel_logout` path customization
+
+### Changed
+
+- **Logout controller rewritten** — no longer depends on Socialite driver instance at logout time; builds Keycloak logout URL directly from config
+- `post_logout_redirect_uri` now always resolves to absolute URL (prefixes `APP_URL` if relative path configured)
+- Default logout mode changed from `local` to `keycloak` (more appropriate for SSO ecosystems)
+- `id_token_hint` sent automatically for silent logout (no Keycloak confirmation page)
+
+### Fixed
+
+- "Invalid redirect uri" error on Keycloak logout — caused by sending relative path instead of absolute URL as `post_logout_redirect_uri`
+
+## [1.1.0] — 2026-07-27
+
+### Added
+
+- Laravel 13 support (`illuminate/contracts ^13.0`, `illuminate/support ^13.0`)
+- `KeycloakWithIdToken` provider — captures `id_token` from token endpoint response for silent logout
+- Logout mode config (`keycloak-socialite.logout.mode`): `local` or `keycloak`
+- `id_token_hint` config for silent Keycloak logout without confirmation page
+- ServiceProvider registers custom `KeycloakWithIdToken` provider instead of base Keycloak provider
+
 ## [1.0.0] — 2026-07-15
 
 ### Added

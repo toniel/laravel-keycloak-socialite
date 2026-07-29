@@ -171,17 +171,59 @@ class KeycloakControllerTest extends TestCase
     }
 
     #[Test]
-    public function it_handles_logout(): void
+    public function it_handles_local_logout(): void
     {
-        config(['keycloak-socialite.logout.redirect_after_logout' => '/']);
+        config(['keycloak-socialite.logout.mode' => 'local']);
 
-        $mockDriver = Mockery::mock();
-        $mockDriver->shouldReceive('getLogoutUrl')
-            ->once()
-            ->with('/', 'test-client')
-            ->andReturn('https://auth.example.com/realms/test-realm/protocol/openid-connect/logout');
+        $user = TestUser::create([
+            'name'     => 'Test User',
+            'email'    => 'test@example.com',
+            'password' => bcrypt('secret'),
+        ]);
 
-        Socialite::shouldReceive('driver')->with('keycloak')->once()->andReturn($mockDriver);
+        $this->actingAs($user);
+
+        $response = $this->get(route('logout.keycloak'));
+
+        // Local mode: redirect to app URL (absolute)
+        $response->assertRedirect('http://localhost/');
+        $this->assertFalse(Auth::check());
+    }
+
+    #[Test]
+    public function it_handles_keycloak_logout_with_id_token_hint(): void
+    {
+        config(['keycloak-socialite.logout.mode' => 'keycloak']);
+        config(['keycloak-socialite.logout.redirect_url' => '/']);
+        config(['keycloak-socialite.logout.id_token_hint' => true]);
+
+        $user = TestUser::create([
+            'name'     => 'Test User',
+            'email'    => 'test@example.com',
+            'password' => bcrypt('secret'),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withSession(['keycloak_id_token' => 'test-id-token'])
+            ->get(route('logout.keycloak'));
+
+        $response->assertRedirect();
+        $redirectUrl = $response->headers->get('Location');
+
+        $this->assertStringContainsString('auth.example.com', $redirectUrl);
+        $this->assertStringContainsString('test-realm', $redirectUrl);
+        $this->assertStringContainsString('id_token_hint=test-id-token', $redirectUrl);
+        $this->assertStringContainsString('post_logout_redirect_uri=', $redirectUrl);
+        $this->assertStringContainsString('client_id=test-client', $redirectUrl);
+        $this->assertFalse(Auth::check());
+    }
+
+    #[Test]
+    public function it_handles_keycloak_logout_without_id_token_hint(): void
+    {
+        config(['keycloak-socialite.logout.mode' => 'keycloak']);
+        config(['keycloak-socialite.logout.redirect_url' => '/']);
+        config(['keycloak-socialite.logout.id_token_hint' => false]);
 
         $user = TestUser::create([
             'name'     => 'Test User',
@@ -198,6 +240,8 @@ class KeycloakControllerTest extends TestCase
 
         $this->assertStringContainsString('auth.example.com', $redirectUrl);
         $this->assertStringContainsString('test-realm', $redirectUrl);
+        $this->assertStringContainsString('client_id=test-client', $redirectUrl);
+        $this->assertStringNotContainsString('id_token_hint', $redirectUrl);
         $this->assertFalse(Auth::check());
     }
 
@@ -212,6 +256,7 @@ class KeycloakControllerTest extends TestCase
         $mock->shouldReceive('getName')->andReturn('Test User');
         $mock->shouldReceive('getId')->andReturn('456');
         $mock->shouldReceive('getAvatar')->andReturn('https://example.com/avatar.jpg');
+        $mock->shouldReceive('getRaw')->andReturn(['id_token' => 'test-id-token']);
 
         return $mock;
     }
