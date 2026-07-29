@@ -8,7 +8,7 @@ use Laravel\Socialite\Facades\Socialite;
 class RedirectToKeycloakController
 {
     /**
-     * Redirect the user to the Keycloak authentication page.
+     * Redirect the user to the Keycloak authorization endpoint.
      */
     public function __invoke(): RedirectResponse
     {
