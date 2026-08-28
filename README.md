@@ -18,6 +18,53 @@ Reusable Keycloak Socialite authentication for Laravel applications. Provides a 
 - Laravel 12+ / 13+
 - A running [Keycloak](https://www.keycloak.org/) server (tested with v26+)
 
+## Keycloak Client Setup
+
+Create one OpenID Connect client per app in Keycloak, generate its client
+secret, and copy the values into `.env`.
+
+### 1. Create the client
+
+**Realm → Clients → Create client**
+
+- **Client type**: OpenID Connect
+- **Client ID**: e.g. `admission-login`
+- Next
+
+**Capability config:**
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Client authentication | **ON** | Required — this is what exposes the **client secret** |
+| Standard flow | **ON** | Authorization Code flow (required) |
+| Implicit flow | OFF | |
+| Direct access grants | OFF | |
+
+**Login settings:**
+
+- **Root URL**: `http://your-app.test`
+- **Valid redirect URIs**: `http://your-app.test/auth/keycloak/callback`
+- **Valid post logout redirect URIs**: `http://your-app.test/*`
+- **Web origins**: `http://your-app.test`
+- Save
+
+### 2. Generate the client secret
+
+**Clients → [your client] → Credentials → Client secret → Regenerate**, then
+copy the value into `.env`:
+
+```env
+KEYCLOAK_CLIENT_SECRET=<copied-secret>
+```
+
+> `KEYCLOAK_REDIRECT_URI` in `.env` must match one of the "Valid redirect URIs"
+> exactly.
+
+### 3. Backchannel logout (recommended for SSO)
+
+For cross-app logout, set the backchannel logout URL — see the
+[Logout](#logout) section.
+
 ## Installation
 
 ```bash
@@ -60,7 +107,7 @@ KEYCLOAK_CLIENT_SECRET=your-client-secret
 KEYCLOAK_REDIRECT_URI=http://your-app.test/auth/keycloak/callback
 
 # Optional
-KEYCLOAK_IDP_HINT=google              # Skip Keycloak login screen, go directly to an IDP
+KEYCLOAK_IDP_HINT=google              # Per-request hint. For a permanent skip (no login page), prefer Keycloak "Authenticate by default" — see Single Sign-On Setup
 KEYCLOAK_AUTO_REGISTER=true           # Create users automatically on first login
 KEYCLOAK_REMEMBER_LOGIN=false         # Disable for SSO — let Keycloak manage session
 KEYCLOAK_REDIRECT_URL=/dashboard      # Fallback post-login redirect
@@ -238,6 +285,50 @@ Event::listen(KeycloakAuthenticationFailed::class, function (KeycloakAuthenticat
 | `logout.redirect_url` | `/` | Post-logout redirect (resolved to absolute URL) |
 | `logout.id_token_hint` | `true` | Send id_token for silent logout |
 | `logout.backchannel_enabled` | `true` | Enable backchannel logout endpoint |
+
+## Single Sign-On Setup
+
+### Login once, access every app
+
+Apps that share the same Keycloak realm share one Keycloak SSO session. When a
+user logs in at App A, Keycloak sets an auth cookie; when they visit App B, that
+app redirects to Keycloak, the cookie authenticator recognises the session, and
+the user is signed in **without a login page or clicking Google again**.
+
+On the Laravel side, keep the SSO-friendly defaults:
+
+- `KEYCLOAK_REMEMBER_LOGIN=false` — let Keycloak own the session (see below)
+- Every app points at the same realm / client
+
+### Skip the Keycloak login page (go straight to Google)
+
+By default Keycloak shows its own login page with a "Google" button. To send
+users **directly to Google** — no Keycloak page, no button click — mark Google
+as the default identity provider:
+
+**Realm → Identity Providers → google → turn ON "Authenticate by default"**
+
+or equivalently:
+
+**Realm → Authentication → Browser flow → Identity Provider Redirector →
+"Default Identity Provider" = google**
+
+> Prefer this over `kc_idp_hint`. `kc_idp_hint` (`KEYCLOAK_IDP_HINT`) is a
+> per-request hint; **"Authenticate by default"** is the realm-level setting
+> that skips the login page *and* keeps cross-app SSO intact.
+
+### Keycloak browser flow order
+
+The default flow already favours SSO — keep it in this order:
+
+1. **Cookie** — checks the SSO cookie first, so returning users sign in
+   instantly (this is what makes cross-app SSO work).
+2. **Identity Provider Redirector** — with Google set as the default IdP, new
+   users are sent straight to Google.
+
+If users still land on the Keycloak login page, check that (a) Google is the
+default IdP and (b) the Cookie authenticator is the first step in the browser
+flow.
 
 ## Important Notes
 

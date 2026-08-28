@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-08-29
+
+### Documentation
+
+- Add a "Single Sign-On Setup" section covering cross-app SSO (login once, access all apps) and skipping the Keycloak login page via the IdP "Authenticate by default" setting
+- Add a "Keycloak Client Setup" section covering client creation, client-secret generation, and required redirect / post-logout / web-origin settings
+
 ## [1.3.0] — 2026-08-28
 
 ### Added
