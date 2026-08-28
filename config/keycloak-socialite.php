@@ -33,9 +33,11 @@ return [
     | Set to null or empty string to skip sending any hint.
     | Common values: 'google', 'facebook', 'github', etc.
     |
-    | NOTE: For a permanent "skip the login page" setup that also preserves
-    | cross-app SSO, prefer Keycloak's "Authenticate by default" toggle on the
-    | IdP (Realm → Identity Providers → <idp> → Authenticate by default).
+    | NOTE: Setting this to an IdP alias (e.g. 'google') sends users straight
+    | to that IdP, skipping the Keycloak login page. The realm-level equivalent
+    | is Keycloak's "Authenticate by default" toggle
+    | (Realm → Identity Providers → <idp> → Authenticate by default). If
+    | neither is set, Keycloak shows its own login page.
     |
     */
     'idp_hint' => env('KEYCLOAK_IDP_HINT', 'google'),

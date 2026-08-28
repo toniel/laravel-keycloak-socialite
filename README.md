@@ -107,7 +107,7 @@ KEYCLOAK_CLIENT_SECRET=your-client-secret
 KEYCLOAK_REDIRECT_URI=http://your-app.test/auth/keycloak/callback
 
 # Optional
-KEYCLOAK_IDP_HINT=google              # Per-request hint. For a permanent skip (no login page), prefer Keycloak "Authenticate by default" — see Single Sign-On Setup
+KEYCLOAK_IDP_HINT=google              # Go straight to Google (skip the Keycloak login page). Alt: Keycloak "Authenticate by default" — see Single Sign-On Setup
 KEYCLOAK_AUTO_REGISTER=true           # Create users automatically on first login
 KEYCLOAK_REMEMBER_LOGIN=false         # Disable for SSO — let Keycloak manage session
 KEYCLOAK_REDIRECT_URL=/dashboard      # Fallback post-login redirect
@@ -303,19 +303,26 @@ On the Laravel side, keep the SSO-friendly defaults:
 ### Skip the Keycloak login page (go straight to Google)
 
 By default Keycloak shows its own login page with a "Google" button. To send
-users **directly to Google** — no Keycloak page, no button click — mark Google
-as the default identity provider:
+users **directly to Google** — no Keycloak page, no button click — enable one
+of the two options below (both do the same thing):
+
+**Option A — app-side (`KEYCLOAK_IDP_HINT`)**
+
+The package adds `kc_idp_hint=google` to every authorization URL:
+
+```env
+KEYCLOAK_IDP_HINT=google
+```
+
+**Option B — Keycloak-side (`Authenticate by default`)**
 
 **Realm → Identity Providers → google → turn ON "Authenticate by default"**
 
-or equivalently:
+or equivalently: **Realm → Authentication → Browser flow → Identity Provider
+Redirector → "Default Identity Provider" = google**
 
-**Realm → Authentication → Browser flow → Identity Provider Redirector →
-"Default Identity Provider" = google**
-
-> Prefer this over `kc_idp_hint`. `kc_idp_hint` (`KEYCLOAK_IDP_HINT`) is a
-> per-request hint; **"Authenticate by default"** is the realm-level setting
-> that skips the login page *and* keeps cross-app SSO intact.
+> If **neither** option is set, Keycloak shows its own login page. If both are
+> set, the per-request `kc_idp_hint` wins.
 
 ### Keycloak browser flow order
 
