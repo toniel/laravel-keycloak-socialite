@@ -42,3 +42,23 @@ if (config('keycloak-socialite.logout.backchannel_enabled', true)) {
     )->name('login.keycloak.backchannel-logout')
      ->withoutMiddleware(['web', \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 }
+
+/*
+|--------------------------------------------------------------------------
+| Optional guest login redirect
+|--------------------------------------------------------------------------
+|
+| When enabled, the package registers a `login` named route that redirects
+| to the Keycloak authorization endpoint. Laravel's `auth` middleware sends
+| unauthenticated users here, so they land straight on Keycloak (e.g. Google)
+| instead of the app's own login page.
+|
+| Remove any /login route your app defines to avoid a duplicate route name/URI.
+|
+*/
+if (config('keycloak-socialite.routes.auto_login_redirect', false)) {
+    Route::redirect(
+        config('keycloak-socialite.routes.login', 'login'),
+        '/'.ltrim(config('keycloak-socialite.routes.redirect', 'auth/keycloak'), '/')
+    )->name(config('keycloak-socialite.routes.login_as', 'login'));
+}

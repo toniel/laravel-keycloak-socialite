@@ -5,6 +5,20 @@ All notable changes to `toniel/laravel-keycloak-socialite` will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.3.0] — 2026-08-28
+
+### Added
+
+- **Auto login redirect** — optional `routes.auto_login_redirect` config (default `false`) that registers a `login` named route forwarding guests straight to the Keycloak authorization endpoint, so unauthenticated users skip the app's own login page
+- Config: `routes.auto_login_redirect`, `routes.login`, `routes.login_as`
+
+### Documentation
+
+- Use Composer's `-W` option during installation so applications with Guzzle 8 locked can resolve Laravel Socialite's supported Guzzle 7 release
+- Document the targeted update command for existing installations affected by a partial Composer update
+
 ## [1.2.0] — 2026-07-29
 
 ### Added

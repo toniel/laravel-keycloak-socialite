@@ -9,6 +9,7 @@ Reusable Keycloak Socialite authentication for Laravel applications. Provides a 
 - **Backchannel Logout** — When user logs out from any app, all other apps in the ecosystem are logged out automatically
 - **Cross-app SSO** — Login once, access all apps in the same Keycloak realm
 - **Configurable IDP Hint** — Skip Keycloak login screen, go directly to Google/GitHub/etc
+- **Auto login redirect** — Register a `login` route that forwards guests straight to Keycloak (opt-in)
 - **Event-driven** — Hook into login, registration, and failure events
 
 ## Requirements
@@ -20,7 +21,18 @@ Reusable Keycloak Socialite authentication for Laravel applications. Provides a 
 ## Installation
 
 ```bash
-composer require toniel/laravel-keycloak-socialite
+composer require toniel/laravel-keycloak-socialite -W
+```
+
+The `-W` (`--with-all-dependencies`) option lets Composer select Guzzle 7 when the
+application lock file currently contains Guzzle 8. Laravel Socialite 5 supports
+Guzzle 6 and 7, but does not yet support Guzzle 8.
+
+If the package is already listed in `composer.json`, update it together with
+Guzzle and its related packages:
+
+```bash
+composer update toniel/laravel-keycloak-socialite laravel/socialite guzzlehttp/guzzle guzzlehttp/promises guzzlehttp/psr7 -W
 ```
 
 Publish the configuration file:
@@ -92,8 +104,11 @@ The package automatically registers these routes:
 | GET | `/auth/keycloak/callback` | `login.keycloak.callback` | Handle OAuth callback |
 | GET | `/auth/keycloak/logout` | `logout.keycloak` | Logout from app + Keycloak |
 | POST | `/auth/keycloak/backchannel-logout` | `login.keycloak.backchannel-logout` | Receive logout signal from Keycloak |
+| GET | `/login` | `login` | Forward guests to Keycloak (only when `routes.auto_login_redirect` is `true`) |
 
 To disable auto-registration and define your own routes, set `routes.enabled` to `false` in config.
+
+> When `routes.auto_login_redirect` is enabled, the package registers the `login` named route. Remove any `/login` route your app defines to avoid a duplicate route name/URI conflict.
 
 ## Logout
 
@@ -216,6 +231,9 @@ Event::listen(KeycloakAuthenticationFailed::class, function (KeycloakAuthenticat
 | `auto_register` | `true` | Create users on first login |
 | `remember_login` | `false` | Disable for SSO apps (let Keycloak manage session) |
 | `routes.enabled` | `true` | Auto-register routes |
+| `routes.auto_login_redirect` | `false` | Register a `login` route that redirects to Keycloak |
+| `routes.login` | `login` | Guest login route URI |
+| `routes.login_as` | `login` | Guest login route name |
 | `logout.mode` | `keycloak` | `keycloak` or `local` |
 | `logout.redirect_url` | `/` | Post-logout redirect (resolved to absolute URL) |
 | `logout.id_token_hint` | `true` | Send id_token for silent logout |

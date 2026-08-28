@@ -97,6 +97,8 @@ return [
     |
     | enabled: Set to false to define your own routes manually.
     | redirect/callback/logout: URI paths for each endpoint.
+    | auto_login_redirect: Register a `login` route that forwards to Keycloak
+    |   instead of the app's own login page.
     | redirect_as/callback_as/logout_as: Named route names.
     |
     */
@@ -107,6 +109,10 @@ return [
         'callback'    => 'auth/keycloak/callback',
         'logout'      => 'auth/keycloak/logout',
         'backchannel_logout' => 'auth/keycloak/backchannel-logout',
+
+        'auto_login_redirect' => env('KEYCLOAK_AUTO_LOGIN_REDIRECT', false),
+        'login'               => 'login',
+        'login_as'            => 'login',
 
         'redirect_as' => 'login.keycloak',
         'callback_as' => 'login.keycloak.callback',
