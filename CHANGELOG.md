@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-09-03
+
 ### Added
 
 - **Silent SSO check (`prompt=none`)** — guests are signed in automatically when a Keycloak SSO session already exists, on any page including public ones. Enable with `KEYCLOAK_SILENT_SSO=true`.
