@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Logging out now stamps the silent SSO check, so the next page load does not immediately sign the user back in. This mattered most with `logout.mode` = `local`, where the Keycloak SSO session survives the logout and the check would have undone it.
+
 ## [1.4.0] — 2026-09-03
 
 ### Added

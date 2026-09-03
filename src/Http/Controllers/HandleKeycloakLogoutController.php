@@ -5,6 +5,7 @@ namespace Toniel\LaravelKeycloakSocialite\Http\Controllers;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Toniel\LaravelKeycloakSocialite\Support\SilentSso;
 
 class HandleKeycloakLogoutController
 {
@@ -68,6 +69,12 @@ class HandleKeycloakLogoutController
         if (session()->isStarted()) {
             session()->invalidate();
             session()->regenerateToken();
+
+            // The user just asked to leave. Stamp the silent SSO check so the
+            // next page load does not immediately offer them back to Keycloak
+            // — in 'local' mode the SSO session is still alive and would sign
+            // them straight back in, undoing the logout they just performed.
+            SilentSso::stampAttempt();
         }
 
         // ── Redirect ──

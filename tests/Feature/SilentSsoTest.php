@@ -242,6 +242,26 @@ class SilentSsoTest extends TestCase
     }
 
     #[Test]
+    public function logging_out_stamps_the_check_so_the_user_is_not_pulled_back_in(): void
+    {
+        config()->set('keycloak-socialite.logout.mode', 'local');
+
+        $user = TestUser::create([
+            'name'     => 'John Doe',
+            'email'    => 'john@example.com',
+            'password' => bcrypt('secret'),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('logout.keycloak'))
+            ->assertSessionHas(SilentSso::SESSION_CHECKED_AT);
+
+        // The Keycloak SSO session outlives a local logout, so without the
+        // stamp the very next page load would sign the user straight back in.
+        $this->get('/public-page')->assertOk();
+    }
+
+    #[Test]
     public function a_successful_silent_check_logs_the_user_in_and_clears_the_state(): void
     {
         TestUser::create([
