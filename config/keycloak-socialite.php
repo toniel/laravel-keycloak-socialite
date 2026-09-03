@@ -127,6 +127,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Silent SSO Check (prompt=none)
+    |--------------------------------------------------------------------------
+    |
+    | Cross-app SSO only kicks in once an app asks Keycloak who the visitor is.
+    | With this enabled, guests are sent through a one-off `prompt=none`
+    | authorization request: Keycloak either signs them in from the shared SSO
+    | cookie, or answers `error=login_required` and they carry on as a guest.
+    | No login page, no Google screen, no click.
+    |
+    | enabled:     Turn the whole feature on.
+    | auto_apply:  Push the middleware onto the `web` group automatically. Set
+    |              to false to apply `keycloak.sso` to selected routes yourself.
+    | retry_after: Seconds before a guest is checked again. 0 = check only once
+    |              per session. Lower values notice a login in another app
+    |              sooner, at the cost of more redirects.
+    | except:      Extra URI patterns (as accepted by Request::is()) to skip,
+    |              e.g. 'webhooks/*'. The package's own auth routes are always
+    |              skipped.
+    |
+    */
+    'silent_sso' => [
+        'enabled'     => env('KEYCLOAK_SILENT_SSO', false),
+        'auto_apply'  => env('KEYCLOAK_SILENT_SSO_AUTO_APPLY', true),
+        'route'       => 'auth/keycloak/silent-check',
+        'route_as'    => 'login.keycloak.silent-check',
+        'retry_after' => env('KEYCLOAK_SILENT_SSO_RETRY_AFTER', 600),
+        'except'      => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Logout Configuration
     |--------------------------------------------------------------------------
     |

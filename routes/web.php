@@ -5,6 +5,7 @@ use Toniel\LaravelKeycloakSocialite\Http\Controllers\HandleBackchannelLogoutCont
 use Toniel\LaravelKeycloakSocialite\Http\Controllers\HandleKeycloakCallbackController;
 use Toniel\LaravelKeycloakSocialite\Http\Controllers\HandleKeycloakLogoutController;
 use Toniel\LaravelKeycloakSocialite\Http\Controllers\RedirectToKeycloakController;
+use Toniel\LaravelKeycloakSocialite\Http\Controllers\SilentSsoCheckController;
 
 Route::middleware(['web'])->group(function () {
     Route::get(
@@ -21,6 +22,22 @@ Route::middleware(['web'])->group(function () {
         config('keycloak-socialite.routes.logout', 'auth/keycloak/logout'),
         HandleKeycloakLogoutController::class
     )->name(config('keycloak-socialite.routes.logout_as', 'logout.keycloak'));
+
+    /*
+    |----------------------------------------------------------------------
+    | Silent SSO check (prompt=none)
+    |----------------------------------------------------------------------
+    |
+    | Asks Keycloak whether an SSO session already exists. If it does, the
+    | user comes back through the normal callback already authenticated; if
+    | it does not, Keycloak answers with `error=login_required` and the user
+    | is returned to their page as a guest. Either way no login UI is shown.
+    |
+    */
+    Route::get(
+        config('keycloak-socialite.silent_sso.route', 'auth/keycloak/silent-check'),
+        SilentSsoCheckController::class
+    )->name(config('keycloak-socialite.silent_sso.route_as', 'login.keycloak.silent-check'));
 });
 
 /*

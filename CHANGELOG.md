@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Silent SSO check (`prompt=none`)** — guests are signed in automatically when a Keycloak SSO session already exists, on any page including public ones. Enable with `KEYCLOAK_SILENT_SSO=true`.
+- Route `GET /auth/keycloak/silent-check` (`login.keycloak.silent-check`)
+- Middleware `AttemptKeycloakSso`, aliased as `keycloak.sso`, pushed onto the `web` group when `silent_sso.auto_apply` is `true`
+- Support class `SilentSso` holding the session keys and retry rule
+- The middleware is registered through the HTTP kernel and slotted into the middleware priority list ahead of `auth`, so it survives the kernel's group sync and runs before guests are redirected to the login page
+- The silent check skips the `login` route when `routes.auto_login_redirect` is enabled — that route already forwards to Keycloak interactively
+- Config: `silent_sso.enabled`, `silent_sso.auto_apply`, `silent_sso.route`, `silent_sso.route_as`, `silent_sso.retry_after`, `silent_sso.except`
+
+### Changed
+
+- The callback controller now handles `error=...` responses from the authorization endpoint. `login_required` (and the other no-session OIDC errors) during a silent check returns the guest to their page quietly; other errors still redirect to `login` with a flash message and a `KeycloakAuthenticationFailed` event.
+
+### Documentation
+
+- Explain why cross-app SSO does not kick in on its own, and what can trigger it, in "Single Sign-On Setup"
+- Add a "Troubleshooting" section covering a guest session that survives a login elsewhere, silent checks that never sign anyone in, redirect loops, and a middleware that never runs
+
 ## [1.3.2] — 2026-08-29
 
 ### Documentation

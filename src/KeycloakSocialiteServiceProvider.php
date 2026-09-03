@@ -2,10 +2,14 @@
 
 namespace Toniel\LaravelKeycloakSocialite;
 
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Socialite\Facades\Socialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use Toniel\LaravelKeycloakSocialite\Http\Middleware\AttemptKeycloakSso;
 use Toniel\LaravelKeycloakSocialite\Providers\KeycloakWithIdToken;
 
 class KeycloakSocialiteServiceProvider extends ServiceProvider
@@ -53,6 +57,58 @@ class KeycloakSocialiteServiceProvider extends ServiceProvider
         // Load routes (if enabled in config)
         if (config('keycloak-socialite.routes.enabled', true)) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+        }
+
+        $this->registerSilentSsoMiddleware();
+    }
+
+    /**
+     * Register the silent SSO middleware.
+     *
+     * The alias is always available so apps can apply it to selected routes;
+     * when silent SSO is enabled with auto_apply, it is also pushed onto the
+     * `web` group so every page load can pick up an existing SSO session.
+     */
+    protected function registerSilentSsoMiddleware(): void
+    {
+        /** @var Router $router */
+        $router = $this->app['router'];
+
+        $router->aliasMiddleware('keycloak.sso', AttemptKeycloakSso::class);
+
+        if (config('keycloak-socialite.silent_sso.enabled', false)
+            && config('keycloak-socialite.silent_sso.auto_apply', true)) {
+            $this->applySilentSsoMiddleware($router);
+        }
+    }
+
+    /**
+     * Add the silent check to the `web` group, ahead of `auth`.
+     *
+     * Registering through the HTTP kernel rather than the router matters:
+     * the kernel re-syncs its own middleware groups onto the router when it
+     * boots, which would drop a group entry pushed straight onto the router.
+     * `auth` also sits in the framework's middleware priority list, so it is
+     * pulled ahead of unlisted middleware — guests would be bounced to the
+     * login page before the silent check ever ran.
+     */
+    protected function applySilentSsoMiddleware(Router $router): void
+    {
+        $kernel = $this->app->bound(HttpKernel::class)
+            ? $this->app->make(HttpKernel::class)
+            : null;
+
+        if ($kernel && method_exists($kernel, 'appendMiddlewareToGroup')) {
+            $kernel->appendMiddlewareToGroup('web', AttemptKeycloakSso::class);
+        } else {
+            $router->pushMiddlewareToGroup('web', AttemptKeycloakSso::class);
+        }
+
+        if ($kernel && method_exists($kernel, 'addToMiddlewarePriorityBefore')) {
+            $kernel->addToMiddlewarePriorityBefore(
+                AuthenticatesRequests::class,
+                AttemptKeycloakSso::class
+            );
         }
     }
 
