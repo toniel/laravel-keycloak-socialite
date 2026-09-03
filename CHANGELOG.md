@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The callback controller now handles `error=...` responses from the authorization endpoint. `login_required` (and the other no-session OIDC errors) during a silent check returns the guest to their page quietly; other errors still redirect to `login` with a flash message and a `KeycloakAuthenticationFailed` event.
 
+### Documentation
+
+- Explain why cross-app SSO does not kick in on its own, and what can trigger it, in "Single Sign-On Setup"
+- Add a "Troubleshooting" section covering a guest session that survives a login elsewhere, silent checks that never sign anyone in, redirect loops, and a middleware that never runs
+
 ## [1.3.2] — 2026-08-29
 
 ### Documentation

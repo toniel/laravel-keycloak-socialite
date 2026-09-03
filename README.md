@@ -8,6 +8,7 @@ Reusable Keycloak Socialite authentication for Laravel applications. Provides a 
 - **Silent Logout** — Logout from Keycloak without confirmation page (via `id_token_hint`)
 - **Backchannel Logout** — When user logs out from any app, all other apps in the ecosystem are logged out automatically
 - **Cross-app SSO** — Login once, access all apps in the same Keycloak realm
+- **Silent SSO check** — Guests are signed in automatically from an existing Keycloak session, with no visible login step (`prompt=none`, opt-in)
 - **Configurable IDP Hint** — Skip Keycloak login screen, go directly to Google/GitHub/etc
 - **Auto login redirect** — Register a `login` route that forwards guests straight to Keycloak (opt-in)
 - **Event-driven** — Hook into login, registration, and failure events
@@ -418,6 +419,47 @@ In an SSO ecosystem, session management should be handled by Keycloak — not by
 ### Google/IDP Session Behavior
 
 If users log in via an external IDP (Google, GitHub, etc.) through Keycloak, logging out from Keycloak does **not** log them out from the IDP. If the IDP session is still active, Keycloak may silently re-authenticate the user on next access. This is expected SSO behavior.
+
+## Troubleshooting
+
+### "I logged in at App A, but App B still shows me as a guest"
+
+Expected, until App B asks Keycloak who the visitor is. The Keycloak SSO
+session is shared; the Laravel session is not — each app has its own session
+cookie on its own domain. Nothing carries over until App B sends an
+authorization request. Pick a trigger: a login link to `login.keycloak`,
+`routes.auto_login_redirect` for protected pages, or `silent_sso.enabled` for
+every page (see [Single Sign-On Setup](#single-sign-on-setup)).
+
+### The silent check redirects but the user is never signed in
+
+Look at what Keycloak returns to `/auth/keycloak/callback`:
+
+- `error=login_required` — there is genuinely no SSO session. Confirm both apps
+  point at the **same realm** and the same `KEYCLOAK_BASE_URL` host, so they
+  share the SSO cookie. Different hosts for the same Keycloak (`localhost` vs
+  `127.0.0.1`, say) mean different cookies and therefore different sessions.
+- `error=invalid_client` / `invalid_redirect_uri` — this app's client id,
+  secret, or redirect URI is wrong for the realm.
+
+### Users bounce between the app and Keycloak
+
+Each silent check is stamped in the session before leaving the app, so the
+middleware cannot loop on its own. A loop usually means the session is not
+persisting: check `SESSION_DOMAIN`, and that apps on different domains are not
+sharing a cookie name with a domain-wide `SESSION_DOMAIN`.
+
+### Nothing happens at all
+
+`silent_sso.enabled` must be `true` *and* the middleware must be applied. With
+`auto_apply` on, confirm it landed in the group:
+
+```bash
+php artisan route:list -v --path=/
+```
+
+If you set `auto_apply` to `false`, apply `keycloak.sso` to your routes
+yourself.
 
 ## Testing
 
