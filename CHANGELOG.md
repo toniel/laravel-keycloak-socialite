@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Expand the backchannel logout setup: why front-channel logout must be off, how to make a containerised Keycloak reach the app, a "Verifying it works" table mapping each log line to its cause, and the `keycloak_id` requirement
+- Note that "Backchannel logout session required" is optional — the package matches users by `sub` and ignores `sid`
+
 ## [1.4.1] — 2026-09-03
 
 ### Fixed

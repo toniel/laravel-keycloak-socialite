@@ -63,8 +63,10 @@ KEYCLOAK_CLIENT_SECRET=<copied-secret>
 
 ### 3. Backchannel logout (recommended for SSO)
 
-For cross-app logout, set the backchannel logout URL — see the
-[Logout](#logout) section.
+For cross-app logout, turn **off** front-channel logout and set the backchannel
+logout URL — see [Backchannel Logout](#backchannel-logout) for the full setup,
+including the two things that silently stop it working (front-channel logout
+left on, and Keycloak being unable to reach your app's host).
 
 ## Installation
 
@@ -208,17 +210,62 @@ Backchannel logout enables **cross-app session kill**. When a user logs out from
 1. Go to **Clients → [your client] → Settings → Logout settings**
 2. Turn OFF **"Front-channel logout"**
 3. Set **"Backchannel logout URL"**: `https://your-app.com/auth/keycloak/backchannel-logout`
-4. Turn ON **"Backchannel logout session required"**
+4. **"Backchannel logout session required"** — optional, either setting works.
+   ON makes Keycloak include a `sid` claim; the package matches users by `sub`
+   and ignores `sid`, destroying every local session that belongs to the user.
 
-> **Note:** If Keycloak runs in Docker, it must be able to reach your app's URL. Add `extra_hosts` to your docker-compose:
+Step 2 is the one that silently breaks everything: while front-channel logout
+is ON, Keycloak logs the client out through the browser and **never calls the
+backchannel URL**, however correctly that URL is configured.
+
+> **Note:** Keycloak must reach the URL from *its own* network, not from your
+> browser. If it runs in a container, `https://your-app.test` is resolved
+> inside that container — and a container that inherits your host's
+> `/etc/hosts` will map it to its own loopback, where nothing is listening.
+> Point it at the host instead:
 > ```yaml
 > services:
 >   keycloak:
 >     extra_hosts:
 >       - "your-app.test:host-gateway"
 > ```
+> A container only writes `/etc/hosts` when it is **created**, so recreate it
+> (`docker compose up -d --force-recreate keycloak`) — restarting is not
+> enough.
 
 **Supported session drivers:** `database` (recommended). For `file` driver, the package invalidates the remember token as fallback.
+
+**Requirement:** the user's `keycloak_id` must be stored locally — that column
+is what the `sub` claim is matched against. Users created before the package
+was installed have to log in once for it to be filled in.
+
+#### Verifying it works
+
+Log out from one app, then read the *other* app's log:
+
+```
+Backchannel logout received       {"sub":"b423faec-…","sid":"PFlHrJl-…"}
+Backchannel logout: destroyed sessions  {"user_id":4,"sessions_deleted":1}
+```
+
+Both lines appearing means the whole path works. What each symptom means:
+
+| Symptom | Cause |
+|---------|-------|
+| No log line at all | Keycloak never sent it: front-channel logout is still ON, or it cannot reach the URL. Check Keycloak's own log for `KC-SERVICES0057: Logout for client '…' failed` — it names the host and port it tried |
+| `user not found locally` | No user with that `keycloak_id`; the `sub` does not match any row |
+| `destroyed sessions … "sessions_deleted":0` | Delivered and matched, but that app had no active session — not a failure |
+| `missing logout_token` | Something other than Keycloak POSTed to the endpoint |
+| The endpoint returns 500 | The handler logs on every call, so an unwritable `storage/logs` throws before sessions are destroyed. Make the log writable by the web-server user |
+
+The other app's UI does not change by itself — the session row is deleted
+server-side, so the user is logged out on their **next** request there.
+
+> If the user seems to be signed straight back in afterwards, backchannel
+> logout is not the culprit: the IdP session (Google, etc.) survives a Keycloak
+> logout, so any page that forces a login will silently re-authenticate them.
+> See [Google/IDP Session Behavior](#googleidp-session-behavior) — keep at
+> least one page reachable without login.
 
 ### Logout Configuration
 
@@ -451,6 +498,13 @@ Each silent check is stamped in the session before leaving the app, so the
 middleware cannot loop on its own. A loop usually means the session is not
 persisting: check `SESSION_DOMAIN`, and that apps on different domains are not
 sharing a cookie name with a domain-wide `SESSION_DOMAIN`.
+
+### Logging out of one app leaves the others logged in
+
+That is backchannel logout, not the silent SSO check. Work through
+[Verifying it works](#verifying-it-works): the usual causes are front-channel
+logout still being ON for the client, or Keycloak not being able to reach your
+app's hostname from inside its own container.
 
 ### Nothing happens at all
 
