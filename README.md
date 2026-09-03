@@ -348,7 +348,8 @@ Either way the user only sees their own page. Behind the scenes:
   (default 600; set `0` to check only once per session). Lower it if users
   should pick up a login from another app faster, at the cost of more redirects.
 - Only plain GET page loads are interrupted — never POSTs, XHR/JSON requests, or
-  the package's own auth routes.
+  the package's own auth routes. When `routes.auto_login_redirect` is on, the
+  `login` route is skipped too: it already forwards to Keycloak interactively.
 - `kc_idp_hint` is deliberately **not** sent on the silent check: with
   `prompt=none` no interaction is allowed, so hinting at an IdP is meaningless.
 

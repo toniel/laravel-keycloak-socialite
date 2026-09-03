@@ -119,6 +119,26 @@ class SilentSsoTest extends TestCase
     }
 
     #[Test]
+    public function it_skips_the_login_route_when_auto_login_redirect_is_on(): void
+    {
+        config()->set('keycloak-socialite.routes.auto_login_redirect', true);
+
+        Route::get('sso-login', fn () => 'Forwarded')
+            ->middleware(['web', AttemptKeycloakSso::class]);
+        config()->set('keycloak-socialite.routes.login', 'sso-login');
+
+        $this->get('/sso-login')->assertOk();
+    }
+
+    #[Test]
+    public function it_honours_extra_except_patterns(): void
+    {
+        config()->set('keycloak-socialite.silent_sso.except', ['public-page']);
+
+        $this->get('/public-page')->assertOk();
+    }
+
+    #[Test]
     public function the_check_redirects_to_keycloak_with_prompt_none(): void
     {
         $mockDriver = Mockery::mock();

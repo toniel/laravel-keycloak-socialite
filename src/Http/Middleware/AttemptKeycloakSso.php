@@ -57,12 +57,22 @@ class AttemptKeycloakSso
     {
         $routes = config('keycloak-socialite.routes', []);
 
-        $paths = array_filter([
+        $paths = [
             $routes['redirect'] ?? 'auth/keycloak',
             $routes['callback'] ?? 'auth/keycloak/callback',
             $routes['logout'] ?? 'auth/keycloak/logout',
             $routes['backchannel_logout'] ?? 'auth/keycloak/backchannel-logout',
             config('keycloak-socialite.silent_sso.route', 'auth/keycloak/silent-check'),
+        ];
+
+        // With auto_login_redirect on, the login route already forwards to
+        // Keycloak interactively — checking silently first is a wasted trip.
+        if (config('keycloak-socialite.routes.auto_login_redirect', false)) {
+            $paths[] = $routes['login'] ?? 'login';
+        }
+
+        $paths = array_filter([
+            ...$paths,
             ...(array) config('keycloak-socialite.silent_sso.except', []),
         ]);
 

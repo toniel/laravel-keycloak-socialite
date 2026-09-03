@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Route `GET /auth/keycloak/silent-check` (`login.keycloak.silent-check`)
 - Middleware `AttemptKeycloakSso`, aliased as `keycloak.sso`, pushed onto the `web` group when `silent_sso.auto_apply` is `true`
 - Support class `SilentSso` holding the session keys and retry rule
+- The silent check skips the `login` route when `routes.auto_login_redirect` is enabled — that route already forwards to Keycloak interactively
 - Config: `silent_sso.enabled`, `silent_sso.auto_apply`, `silent_sso.route`, `silent_sso.route_as`, `silent_sso.retry_after`, `silent_sso.except`
 
 ### Changed
