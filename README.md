@@ -342,6 +342,8 @@ happens:
 
 Either way the user only sees their own page. Behind the scenes:
 
+- The check runs *before* the `auth` middleware, so a guest opening a protected
+  page is signed in silently instead of being bounced to the login page first.
 - The attempt is stamped in the session *before* leaving the app, so a broken
   round-trip can never cause a redirect loop.
 - A guest is re-checked at most once every `silent_sso.retry_after` seconds
