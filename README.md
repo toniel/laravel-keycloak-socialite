@@ -468,7 +468,51 @@ In an SSO ecosystem, session management should be handled by Keycloak — not by
 
 ### Google/IDP Session Behavior
 
-If users log in via an external IDP (Google, GitHub, etc.) through Keycloak, logging out from Keycloak does **not** log them out from the IDP. If the IDP session is still active, Keycloak may silently re-authenticate the user on next access. This is expected SSO behavior.
+If users log in via an external IDP (Google, GitHub, etc.) through Keycloak,
+logging out from Keycloak does **not** log them out from the IDP. Google in
+particular implements no OIDC logout at all — its discovery document carries no
+`end_session_endpoint`, no `frontchannel_logout_supported` and no
+`backchannel_logout_supported`; the only related endpoint revokes tokens, not the
+browser session. So there is no supported way to federate a logout to Google, and
+`accounts.google.com/Logout` is not one either: it signs the person out of every
+Google service in that browser.
+
+The consequence is a logout that looks broken but isn't. The app's session is
+gone and Keycloak's SSO session is gone, but the moment the user touches a page
+that forces a login, Keycloak asks Google, Google recognises its own still-valid
+session, and hands the user straight back — signed in, in a fraction of a second.
+
+Two things fix the experience, and they compose:
+
+**1. Keep one page reachable without login.** Land the user there after logout
+(`logout.redirect_url`). Nothing forces a login, so the silent check answers
+`login_required` and they come to rest logged out. Without such a page every
+route re-authenticates them immediately.
+
+**2. Set the IDP's `prompt` so the next login is deliberate.** In Keycloak:
+**Identity providers → google → Advanced settings → Prompt**.
+
+| Value | Sent to Google | What the user gets |
+|-------|----------------|--------------------|
+| *(empty)* | no `prompt` parameter | Default. After logout the next login is silent — they are simply back in. |
+| **`select_account`** | `prompt=select_account` | **Recommended.** Google shows the account chooser. Logout feels real, and switching accounts becomes possible. Costs one click per fresh login. |
+| `consent` | `prompt=consent` | Re-displays the scope consent screen on every login. Excessive for daily use. |
+| `login` | `prompt=login` | The OIDC way to force re-authentication, but not every IDP honours it — don't rely on it with Google. |
+| `none` | `prompt=none` | **Not here.** It forbids all interaction at the IDP, so a user without a Google session fails with an error instead of being asked to log in. |
+
+**This does not weaken cross-app SSO.** The two `prompt` values live on different
+hops and never meet:
+
+| Hop | Sender | Value | When |
+|-----|--------|-------|------|
+| App → Keycloak | this package's silent check | `prompt=none` | Every guest, once per session |
+| Keycloak → Google | the IDP setting above | `select_account` | Only when Keycloak actually has to ask Google |
+
+While a Keycloak SSO session exists, the silent check is answered from Keycloak's
+own cookie and **never reaches Google** — so "log in once, land signed in
+everywhere" stays as silent as before. The IDP prompt is felt only when Keycloak
+genuinely must re-authenticate: right after a logout, or once the SSO session has
+expired.
 
 ## Troubleshooting
 
@@ -498,6 +542,15 @@ Each silent check is stamped in the session before leaving the app, so the
 middleware cannot loop on its own. A loop usually means the session is not
 persisting: check `SESSION_DOMAIN`, and that apps on different domains are not
 sharing a cookie name with a domain-wide `SESSION_DOMAIN`.
+
+### Logging out works, but a refresh signs the user straight back in
+
+Not a logout failure. The Keycloak session really is gone — check the other app's
+log for `destroyed sessions` — but the IDP session is not, and the page the user
+refreshed forces a login. See
+[Google/IDP Session Behavior](#googleidp-session-behavior): keep a page reachable
+without login, and set the IDP's `prompt` to `select_account` if logout needs to
+feel final.
 
 ### Logging out of one app leaves the others logged in
 

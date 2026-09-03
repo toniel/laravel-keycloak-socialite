@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Explain the IDP `prompt` setting (`select_account`) as the way to stop Google from silently signing a user back in after logout, including why it does not weaken cross-app SSO — the silent check's `prompt=none` and the IDP prompt sit on different hops
+- Record that Google implements no OIDC logout at all, so a logout cannot be federated to it
+- Add a troubleshooting entry for "logout works, but a refresh signs the user straight back in"
+
+### Documentation
+
 - Expand the backchannel logout setup: why front-channel logout must be off, how to make a containerised Keycloak reach the app, a "Verifying it works" table mapping each log line to its cause, and the `keycloak_id` requirement
 - Note that "Backchannel logout session required" is optional — the package matches users by `sub` and ignores `sid`
 
