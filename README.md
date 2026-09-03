@@ -112,6 +112,11 @@ KEYCLOAK_AUTO_REGISTER=true           # Create users automatically on first logi
 KEYCLOAK_REMEMBER_LOGIN=false         # Disable for SSO — let Keycloak manage session
 KEYCLOAK_REDIRECT_URL=/dashboard      # Fallback post-login redirect
 
+# Silent SSO (log guests in automatically from an existing Keycloak session)
+KEYCLOAK_SILENT_SSO=true              # Enable the prompt=none check
+KEYCLOAK_SILENT_SSO_AUTO_APPLY=true   # Apply the middleware to the whole `web` group
+KEYCLOAK_SILENT_SSO_RETRY_AFTER=600   # Seconds before re-checking a guest (0 = once per session)
+
 # Logout
 KEYCLOAK_LOGOUT_MODE=keycloak         # 'keycloak' (destroy SSO session) or 'local' (app only)
 KEYCLOAK_LOGOUT_REDIRECT=/            # Where to redirect after logout (must be registered in Keycloak)
@@ -150,6 +155,7 @@ The package automatically registers these routes:
 | GET | `/auth/keycloak` | `login.keycloak` | Redirect to Keycloak login |
 | GET | `/auth/keycloak/callback` | `login.keycloak.callback` | Handle OAuth callback |
 | GET | `/auth/keycloak/logout` | `logout.keycloak` | Logout from app + Keycloak |
+| GET | `/auth/keycloak/silent-check` | `login.keycloak.silent-check` | Silent SSO check (`prompt=none`) |
 | POST | `/auth/keycloak/backchannel-logout` | `login.keycloak.backchannel-logout` | Receive logout signal from Keycloak |
 | GET | `/login` | `login` | Forward guests to Keycloak (only when `routes.auto_login_redirect` is `true`) |
 
@@ -281,6 +287,12 @@ Event::listen(KeycloakAuthenticationFailed::class, function (KeycloakAuthenticat
 | `routes.auto_login_redirect` | `false` | Register a `login` route that redirects to Keycloak |
 | `routes.login` | `login` | Guest login route URI |
 | `routes.login_as` | `login` | Guest login route name |
+| `silent_sso.enabled` | `false` | Log guests in automatically from an existing Keycloak SSO session |
+| `silent_sso.auto_apply` | `true` | Push the middleware onto the `web` group |
+| `silent_sso.retry_after` | `600` | Seconds before re-checking a guest (0 = once per session) |
+| `silent_sso.except` | `[]` | Extra URI patterns to skip |
+| `silent_sso.route` | `auth/keycloak/silent-check` | Silent check route URI |
+| `silent_sso.route_as` | `login.keycloak.silent-check` | Silent check route name |
 | `logout.mode` | `keycloak` | `keycloak` or `local` |
 | `logout.redirect_url` | `/` | Post-logout redirect (resolved to absolute URL) |
 | `logout.id_token_hint` | `true` | Send id_token for silent logout |
@@ -295,10 +307,64 @@ user logs in at App A, Keycloak sets an auth cookie; when they visit App B, that
 app redirects to Keycloak, the cookie authenticator recognises the session, and
 the user is signed in **without a login page or clicking Google again**.
 
+The part that trips people up: **each app still has its own Laravel session**,
+and SSO only kicks in once the app actually asks Keycloak who the visitor is.
+Until something triggers that authorization request, App B sees a plain guest —
+even though the Keycloak session is right there. Something has to start the
+conversation:
+
+| Trigger | Effect |
+|---------|--------|
+| The user clicks a "Login" link pointing at `login.keycloak` | Signed in with no Keycloak/Google screen |
+| `routes.auto_login_redirect` = `true` | Guests hitting an `auth` route are signed in automatically |
+| `silent_sso.enabled` = `true` | Guests are signed in automatically on **any** page, including public ones |
+
 On the Laravel side, keep the SSO-friendly defaults:
 
 - `KEYCLOAK_REMEMBER_LOGIN=false` — let Keycloak own the session (see below)
-- Every app points at the same realm / client
+- Every app points at the same realm (each app gets its own client)
+
+### Silent SSO check (`prompt=none`)
+
+```env
+KEYCLOAK_SILENT_SSO=true
+```
+
+That is the whole setup. Guests are then sent once through
+`/auth/keycloak/silent-check`, which asks Keycloak for an authorization code
+with `prompt=none`. OIDC guarantees no UI for that request, so one of two things
+happens:
+
+- **An SSO session exists** → Keycloak returns a code, the normal callback runs,
+  and the user lands back on the page they asked for, logged in.
+- **No SSO session** → Keycloak answers `error=login_required`, and the user is
+  returned to the same page as a guest. No error page, no flash message.
+
+Either way the user only sees their own page. Behind the scenes:
+
+- The attempt is stamped in the session *before* leaving the app, so a broken
+  round-trip can never cause a redirect loop.
+- A guest is re-checked at most once every `silent_sso.retry_after` seconds
+  (default 600; set `0` to check only once per session). Lower it if users
+  should pick up a login from another app faster, at the cost of more redirects.
+- Only plain GET page loads are interrupted — never POSTs, XHR/JSON requests, or
+  the package's own auth routes.
+- `kc_idp_hint` is deliberately **not** sent on the silent check: with
+  `prompt=none` no interaction is allowed, so hinting at an IdP is meaningless.
+
+To pick the routes yourself instead of covering the whole `web` group, disable
+auto-apply and use the `keycloak.sso` middleware alias:
+
+```env
+KEYCLOAK_SILENT_SSO=true
+KEYCLOAK_SILENT_SSO_AUTO_APPLY=false
+```
+
+```php
+Route::middleware(['web', 'keycloak.sso'])->group(function () {
+    Route::get('/', HomeController::class);
+});
+```
 
 ### Skip the Keycloak login page (go straight to Google)
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Silent SSO check (`prompt=none`)** — guests are signed in automatically when a Keycloak SSO session already exists, on any page including public ones. Enable with `KEYCLOAK_SILENT_SSO=true`.
+- Route `GET /auth/keycloak/silent-check` (`login.keycloak.silent-check`)
+- Middleware `AttemptKeycloakSso`, aliased as `keycloak.sso`, pushed onto the `web` group when `silent_sso.auto_apply` is `true`
+- Support class `SilentSso` holding the session keys and retry rule
+- Config: `silent_sso.enabled`, `silent_sso.auto_apply`, `silent_sso.route`, `silent_sso.route_as`, `silent_sso.retry_after`, `silent_sso.except`
+
+### Changed
+
+- The callback controller now handles `error=...` responses from the authorization endpoint. `login_required` (and the other no-session OIDC errors) during a silent check returns the guest to their page quietly; other errors still redirect to `login` with a flash message and a `KeycloakAuthenticationFailed` event.
+
 ## [1.3.2] — 2026-08-29
 
 ### Documentation
